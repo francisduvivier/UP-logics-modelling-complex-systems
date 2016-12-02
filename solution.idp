@@ -1,0 +1,334 @@
+/**
+ * Title: An IDP source file for pacman
+ * Autheurs: Francis Duvivier & Yuri Passchyn
+ */
+
+vocabulary PacmanVoc{
+	
+	type time isa int
+	//Only use Start and Next in your theories, never hardcode integer timepoints!
+	Start: time
+	partial Next(time):time
+	
+	
+	type dir //We guarantee you that dir, Left, Right, Up, Down will always be correctly interpreted in structures. You should not check this.
+	Down: dir
+	Left: dir
+	Right: dir
+	Up: dir
+
+	type xCo isa int
+	type yCo isa int
+
+	type agent //The ghosts and pacman
+	pacman:agent
+	//NoPos(xCo,yCo) drukt uit dat een gegeven positie niet bruikbaar is / niet betreden kan worden, ook al ligt hij in het veld.
+	NoPos(xCo,yCo) 
+	//Geeft aan dat er vanaf een gegeven positie in een gegeven richting zeker een muur staat.
+	Wall(xCo,yCo,dir)
+	
+	//Fluents
+	// Gold(time, xCo, yCo) drukt uit of er wel of niet goud op een gegeven positie staat op een gegeven tijdstip
+	Gold(time, xCo, yCo)
+	//Cn_Gold(time, xCo, yCo) drukt uit of her op een gegeven tijdstip wordt veroorzaakt dat er geen goud zal staan op een gegeven positie op het volgende tijdstip.
+	Cn_Gold(time, xCo, yCo)
+	//Position(time, agent, xCo, yCo) drukt de uit dat een gegeven agent de gegeven positie heeft op een bepaald tijdstip. 
+	Position(time, agent, xCo, yCo)
+	//C_Position(time, agent, xCo, yCo) drukt uit dat er op een gegeven tijdstip wordt veroorzaakt dat op het volgend tijdstip de positie van een gegeven agent de gegeven x en y coordinaten zal hebben.	
+	C_Position(time, agent, xCo, yCo)
+	//C_Position(time, agent, xCo, yCo) drukt uit dat er op een gegeven tijdstip wordt veroorzaakt dat op het volgend tijdstip de positie van een gegeven agent niet de gegeven x en y coordinaten zal hebben.	
+	Cn_Position(time, agent, xCo, yCo)	
+	//GameLost(time) drukt uit op het spel verloren is op een gegeven tijdstip. 
+	GameLost(time) 
+	//GameWon(time) drukt uit op het spel gewonnen is op een gegeven tijdstip. 
+	GameWon(time)	
+	//PreviousMove(time ,agent,dir) drukt de vorige positie van een gegeven agent uit op een gegeven tijdstip
+	PreviousMove(time ,agent,dir)
+	//StupidGhost(time)drukt uit dat een geest op zich heeft vast gelopen op een gegeven tijdtip.
+	StupidGhost(time)
+	//PCrossedAG(time) drukt uit dat pacman een geest heeft gekruisd op een gegeven tijdstip 
+	PCrossedAG(time)
+	//NextTo(time,agent,agent) drukt uit dat twee gegeven agenten naast elkaar staan op een gegeven tijdstip.
+	NextTo(time,agent,agent)
+	
+	//actions
+	Move(time, agent, dir)
+	//end fluents and actions
+	
+	
+	I_gold(xCo, yCo)				//Initial gold location
+	I_position(agent, xCo, yCo)		//Initial positions of agents
+	//OOBX(xCo,dir) drukt uit dat als je vanaf een gegeven xCo in een gegeven richting zou bewegen dat je dan van het bord zou afgaan.
+	OOBX(xCo,dir)
+	//OOBY(yCo,dir) drukt uit dat als je vanaf een gegeven yCo in een gegeven richting zou bewegen dat je dan van het bord zou afgaan.
+	OOBY(yCo,dir)
+	//OOB(xCo,yCo,dir) drukt uit dat als je vanaf een gegeven positie in een gegeven richting zou bewegen dat je dan van het bord zou afgaan.
+	OOB(xCo,yCo,dir)
+	//FoundWall(xCo,yCo,dir) drukt uit dat er op een gegeven positie in een gegven richting een muur moet staan, ook al is deze niet direct gegeven met het Wall-predicaat.
+	FoundWall(xCo,yCo,dir)
+	//GetX(xCo,dir):xCo is een functie die een xCo terug geeft die uitdrukt wat de x-coordinaat is van een tile als je vanaf een gegeven positie in een gegeven richting beweegt.
+	GetX(xCo,dir):xCo
+	//GetY(xCo,dir):yCo is een functie die een yCo terug geeft die uitdrukt wat de x-coordinaat is van een tile als je vanaf een gegeven positie in een gegeven richting beweegt.
+	GetY(yCo,dir):yCo
+	//OppDir(dir):dir is een functie die een richting terug geeft die de tegenovergestelde van de gegeven richting is.
+	OppDir(dir):dir
+	//Reach(xCo,yCo,xCo,yCo) drukt uit dat er een bewandelbaar pad is tussen twee gegeven posities.
+	Reach(xCo,yCo,xCo,yCo)
+	//Neighbor(xCo,yCo,xCo,yCo,dir) Drukt uit dat twee gegeven posities naast elkaar liggen en in welke richting je moet bewegen vanaf de 1e positie om in de tweede uit te komen.
+	Neighbor(xCo,yCo,xCo,yCo,dir)
+	//Steppable(xCo,yCo,xCo,yCo) drukt uit dat het in 1 stap mogelijk is om van de 1e gegeven positie naar de 2e te gaan.
+	Steppable(xCo,yCo,xCo,yCo)
+	//Steppable(xCo,yCo,dir) drukt uit dat het mogelijk is om vanaf een gegeven positie in een gegeven richting the stappen.
+	Steppable(xCo,yCo,dir)
+	//NeighborNoPos(xCo,yCo,dir) drukt uit dat een positie naast een gegeven positie in een gegeven richting NoPos-positie is. 
+	NeighborNoPos(xCo,yCo,dir)
+	
+}
+
+theory TimeTheory:PacmanVoc{
+	{
+		Start = MIN[:time].
+		!t[time]: Next(t) = t+1 <- time(t+1).
+	}
+}
+
+
+
+theory PacmanTheory:PacmanVoc{
+	
+	{
+		//Het position-predicaat is waar op het start-tijdstip als I_position waar is.
+		! a[agent] x[xCo] y[yCo]:Position(Start,a,x,y)<- I_position(a,x,y).
+		//Het positie-predicaat is waar op een eender welk tijdstip als het veroorzaakt was op het vorig tijdstip.
+		! t[time] a[agent] x[xCo] y[yCo]:Position(Next(t),a,x,y)<- C_Position(t,a,x,y).
+		//Het positie-predicaat is ook waar op een eender welk tijdstip als het waar was op het vorig tijdstip en er geen oorzaak was om het niet waar te laten worden.
+		! t[time] a[agent] x[xCo] y[yCo]:Position(Next(t),a,x,y)<- Position(t,a,x,y)&~Cn_Position(t,a,x,y).
+		//Het gold-predicaat is waar op het start-tijdstip als I_gold waar is.
+		! x[xCo] y[yCo]:Gold(Start,x,y)<- I_gold(x,y).
+		//Het Gold predicaat is waar op eender welk tijdtip als het waar was op het vorig tijdstip en er geen oorzaak was om het niet waar te laten worden.
+		! t[time] x[xCo] y[yCo]:Gold(Next(t),x,y)<- Gold(t,x,y)&~Cn_Gold(t,x,y).
+	}
+	
+	{
+		//Dat een bepaalde positie waar is wordt veroorzaakt door te bewegen van een aanliggende positie naar die positie.
+		! t[time] a[agent] x2[xCo] y2[yCo] x1[xCo] y1[yCo] d:C_Position(t,a,x2,y2) <-Position(t,a,x1,y1) & Move(t,a,d)& GetX(x1,d)=x2 & GetY(y1,d)=y2.
+		//Dat een een bepaalde positie van waar naar niet waar gaat wordt veroorzaakt doordat er vanaf die positie bewogen wordt.
+		! t[time] a[agent] x1[xCo] y1[yCo] d:Cn_Position(t,a,x1,y1)<- Position(t,a,x1,y1)&Move(t,a,d).
+		//Er is geen regel om goud ver veroorzaken omdat goud enkel weg mag gaan.
+		//Het niet waar worden van goud op het volgend tijdstip een bepaald positie wordt veroorzaakt doordat pacman er opstaat op dit tijdtip (terwijl het spel nog bezig is).
+		! t[time] x1[xCo] y1[yCo]: Cn_Gold(t,x1,y1)<- ?p[agent]: p=pacman & Position(t,p,x1,y1)&~GameLost(t).
+	}
+	//We modelleren tegenovergestelde richtingen
+	OppDir(Up)=Down.
+	OppDir(Left)=Right.
+	!d1[dir]d2[dir]:OppDir(d1)=d2<=>OppDir(d2)=d1.
+	
+	//getX and getY, waarde blijft hetzelfde wanneer er out of bounds gegaan zou worden,
+	//op deze manier blijft is de functie overal eenduidig bepaald.
+	//Als we naar onder gaan verandert x niet.	
+	!x[xCo]:GetX(x,Down)=x.
+	//Als we naar boven gaan verandert x niet.
+	!x[xCo]:GetX(x,Up)=x.
+	//Als x+1 een geldige x-coordinaat is, dan is de x-coordinaat rechts van x x+1
+	!x[xCo]:xCo(x+1)<=>GetX(x,Right)=x+1.
+	//Als x+1 geen geldige x-coordinaat is, dan bestaat er geen x-coordinaat rechts van x dus geeft de functie dezelfde x terug.
+	!x[xCo]:~xCo(x+1)<=> GetX(x,Right)=x.
+	//Als x+1 en x geldige x-coordinaten zijn,  dan is de x-coordinaat links van x+1 x.
+	!x[xCo]:xCo(x+1) & xCo(x)<=> GetX(x+1,Left)=x.
+	//Als er links van x geen geldige x-coordinaat is, dan bestaat er geen x-coordinaat links van x dus geeft de functie dezelfde x terug.
+	!x[xCo]:OOBX(x,Left)<=>GetX(x,Left)=x.
+	//Als we naar rechts gaan verandert de y-coordinaat niet.
+	!y[yCo]:GetY(y,Right)=y.
+	//Als we naar links gaan verandert de y-coordinaat niet.
+	!y[yCo]:GetY(y,Left)=y.
+	//Als y+1 en y geldige y-coordinaten zijn,  dan is de y-coordinaat onder y+1 y.
+	!y[yCo]:yCo(y+1)&yCo(y)<=>GetY(y+1,Down)=y.
+	//Als er onder y geen geldige y-coordinaat is, dan bestaat er geen y-coordinaat onder y dusgeeft de functie dezelfde y terug.
+	!y[yCo]:OOBY(y,Down)<=>GetY(y,Down)=y.
+	//Als y+1 een geldige y-coordinaat is, dan is de y-coordinaat boven van y y+1
+	!y[yCo]:yCo(y+1)<=>GetY(y,Up)=y+1.
+	//Als y+1 geen geldige y-coordinaat is, dan bestaat er geen y-coordinaat boven y dus geeft de functie dezelfde y terug.	
+	!y[yCo]:~yCo(y+1)<=>GetY(y,Up)=y.
+	
+	
+	
+	//Out of bounds voor X en Y coordinaat
+	//x is gaat of bounds in een bepaalde richting als 
+	!x[xCo],d[dir]:(d=Right&~xCo(x+1))|(d=Left&~(?x2[xCo]:x2+1=x)) <=> OOBX(x,d).
+	!y[yCo],d[dir]:(d=Up&~yCo(y+1))|(d=Down&~(?y2[yCo]:y2+1=y)) <=> OOBY(y,d).
+	
+	//neighbor
+	! x1[xCo]y1[yCo]x2[xCo]y2[yCo]d[dir]:Neighbor(x1,y1,x2,y2,d) <=> (x1~=x2 | y1~=y2) & ~NoPos(x1,y1) & ~NoPos(x2,y2) & GetX(x1,d)=x2 & GetY(y1,d)=y2 & ~OOB(x1,y1,d).
+	//steppable
+	! x1[xCo]x2[xCo]y1[yCo]y2[yCo]: Steppable(x1,y1,x2,y2) <=> ? d[dir]: Neighbor(x1,y1,x2,y2,d) & ~FoundWall(x1,y1,d).
+	! x1[xCo]y1[yCo]d[dir]: Steppable(x1,y1,d) <=> ? x2[xCo],y2[xCo]: Neighbor(x1,y1,x2,y2,d) & ~FoundWall(x1,y1,d).
+	
+
+	//neighborNoPos
+	!x1[xCo]y1[yCo]d[dir]:NeighborNoPos(x1,y1,d)<=>?x2[xCo]y2[yCo]: ~OOB(x1,y1,d)& NoPos(x2,y2) & GetX(x1,d)=x2 & GetY(y1,d)=y2 .
+	
+	{	 
+		//Out of bounds
+		! x[xCo],y[yCo],d[dir]:OOB(x,y,d)<-OOBX(x,d) | OOBY(y,d).
+		//Foundwall modelleren
+		! x[xCo],y[yCo],d[dir]:FoundWall(x,y,d)<- Wall(x,y,d).
+		! x[xCo],y[yCo],d[dir]:FoundWall(GetX(x,d),GetY(y,d),OppDir(d))<- (Wall(x,y,d) & ~OOB(x,y,d)).	
+		//Reach moddeleren
+		! x1[xCo]x2[xCo]y1[yCo]y2[yCo]: Reach(x1,y1,x2,y2) <- Steppable(x1,y1,x2,y2) | (x1=x2 & y1=y2).
+		! x1[xCo]x2[xCo]y1[yCo]y2[yCo]x3[xCo]y3[yCo]: Reach(x1,y1,x3,y3) <- Steppable(x1,y1,x2,y2) & Reach(x2,y2,x3,y3).	
+	}
+
+	//Alle vakjes zijn aaneengesloten
+	?x0[xCo] y0[yCo]: ~NoPos(x0,y0) & ! x1[xCo], y1[yCo]:(~NoPos(x1,y1)=> Reach(x1,y1,x0,y0)).
+
+	{
+		//Gamewon interpretatie 	
+		!t[time]: GameWon(t) <- ! x[xCo]y[yCo]: (~Gold(t,x,y)| StupidGhost(t))&~GameLost(t).
+		!t[time]: GameWon(Next(t)) <- GameWon(t).
+		//Gamelost interpretatie
+		!t[time]: GameLost(t)<- ? x[xCo]y[yCo]p[agent]g[agent]:(p=pacman&p~=g& (Position(t,p,x,y)&Position(t,g,x,y))) | PCrossedAG(t).
+		!t[time]: GameLost(Next(t)) <- GameLost(t).
+	}
+	
+	//niemand mag bewegen als game won/lost
+	!t[time]:GameWon(t) | GameLost(t) => ~? a[agent]d[dir]:Move(t,a,d). 
+	//Iedereen is op exact 1 plaats
+	!t[time]:~? x1[xCo]x2[xCo]y1[yCo]y2[yCo]a[agent]:(x1~=x2 | y1~=y2)&Position(t,a,x1,y1)&Position(t,a,x2,y2).
+	//Niemand of niets staat op plaatsen waar geen vakje is
+	!t[time]:~? x1[xCo]y1[yCo]a[agent]:NoPos(x1,y1)&Position(t,a,x1,y1).
+	//Niemand beweegt door de muren
+	!t[time]:~? a[agent]x[xCo]y[yCo]d[dir]:FoundWall(x,y,d)&Position(t,a,x,y)&Move(t,a,d).
+	//Iedereen kan in hoogstens 1 richting tegelijk bewegen
+	!t[time]:~? a[agent]d1[dir]d2[dir]:d1~=d2&Move(t,a,d1)&Move(t,a,d2).
+	//Een spook kan niet omkeren in 1 beurt
+	!t[time]:~? g[agent]d[dir]:g~=pacman&PreviousMove(t,g,d)&Move(t,g,OppDir(d)).
+	//Niemand beweegt van het bord
+	!t[time]:~? a[agent]x[xCo]y[yCo]d[dir]:OOB(x,y,d)&Position(t,a,x,y)&Move(t,a,d).
+	//Niemand beweegt naar een NoPos
+	!t[time]:~? a[agent]x[xCo]y[yCo]d[dir]:NeighborNoPos(x,y,d)&Position(t,a,x,y)&Move(t,a,d).
+	//Goud mag niet op nopos staan
+	!t[time]:~? x[xCo]y[yCo]:NoPos(x,y) & Gold(t,x,y).
+	//agents moeten altijd bewegen als het spel nog bezig is, behalve als dit onmogelijk is
+	!t[time]:~?a[agent]:!d[dir]:~GameWon(t)&~GameLost(t)&~Move(t,a,d).
+	//Als er een spookje zichzelf vastgelopen heeft is het 	StupidGhost(time) predicaat waar
+	! t[time]: StupidGhost(t)<=> ? x y g: g~=pacman & Position(t,g,x,y) & ! d1 d2: (Steppable(x,y,d1)&Steppable(x,y,d2)=> d1=d2 & PreviousMove(t,g,OppDir(d1))) . 
+	//Twee agents staan naast elkaar als hun posities 'Neighbor'-posities zijn.
+	! t[time] a1[agent] a2[agent]:NextTo(t,a1,a2)<=> ? a1x a1y a2x a2y d: Position(t,a1,a1x,a1y)&Position(t,a2,a2x,a2y) & Neighbor(a1x,a1y,a2x,a2y,d) .
+	
+	{
+		//Als een ghost en pacman elkaar gekruist zijn is PCrossedAG(time) waar
+		! t[time]: PCrossedAG(Next(t))<- ? p g px py gx gy : p=pacman & g~=p &Position(Next(t),p,px,py) & Position(Next(t),g,gx,gy) & Position(t,p,gx,gy) & Position(t,g,px,py) & (px~=gx|py~=gy) . 
+		//We defineren wat previousmove betekent
+		! t[time] a[agent] d: PreviousMove(Next(t),a,d)<-Move(t,a,d).
+	}
+}
+
+include <mx>
+procedure checkExtraT(T,struc, expected, name){
+	print("-----------------------------------------------------Verifying check-----------------------------------------------------")
+	
+	stdoptions.liftedunitpropagation=false
+	stdoptions.groundwithbounds=false 
+	print("calc defs")
+	S=calculatedefinitions(TimeTheory,struc)
+	print("merge constraints")
+	local allconstraints = merge(PacmanTheory, T)
+	stdoptions.nbmodels=1
+	print("model expand")
+	sols=modelexpand(allconstraints,S)
+	if sols==nil then 
+		nbSols=0
+		print("sols was nil")
+	else
+		nbSols=#sols
+	end
+	if nbSols > expected then
+			print(">>>>>>> Verification failed. Found too many models for", name)
+			printmodels(sols)
+	elseif nbSols < expected then
+			print(">>>>>>> Verification failed. Found too few models for", name)
+	 	if nbSols == 0 then 
+				printcore(allconstraints,S) 
+			else
+				printmodels(sols)
+			end
+		else
+			print("Verification succeeded for", name)
+		end
+	print("Not out of memory")
+}
+
+theory verification1: PacmanVoc{
+	//De hoeveelheid goud kan alleen maar omlaag gaan. We verifieren voor deze test dat er geen model gevonden wordt waarvoor de hoeveelheid gold omlaag gaat.
+	? t x y:~Gold(t,x,y)&Gold(Next(t),x,y).
+}
+
+procedure verification1proc(struc){
+		//Om deze verificatie te laten lukken mag er geen enkel model gevonden worden
+	checkExtraT(verification1,struc,0," 1")
+}
+
+theory verification2: PacmanVoc{
+	//	Als het spel ten einde is blijft het teneinde. We verifieren voor deze test dat er geen model gevonden word waarvoor het spel van 'ten einde' naar 'niet ten einde' gaat.
+	?t:~(GameWon(Next(t))|GameLost(Next(t)))& (GameWon(t)|GameLost(t)) &time(t+1).
+}
+
+procedure verification2proc(struc){
+	//Om deze verificatie te laten lukken mag er geen enkel model gevonden worden
+	checkExtraT(verification2,struc,0," 2")
+	
+}
+
+theory verification3: PacmanVoc{
+	// Het is mogelijk om te winnen.
+	?t: GameWon(t).
+}
+
+procedure verification3proc(struc){
+	//Voor deze verificatie te laten lukken moet er een model gevonden worden.
+	checkExtraT(verification3,struc,1," 3")
+}
+
+theory verification4: PacmanVoc{
+	// Het is mogelijk om een spel te verliezen.
+	?t: GameLost(t).
+}
+
+procedure verification4proc(struc){
+	checkExtraT(verification4,struc,1," 4")
+}
+
+procedure allVerifications(){
+	strucToCheck = verStruc
+	verification1proc(strucToCheck)
+	verification2proc(strucToCheck)
+	verification3proc(strucToCheck)
+	verification4proc(strucToCheck)
+
+}
+
+structure verStruc: PacmanVoc{
+	
+	time={0..50}
+	dir = {u;d;l;r}
+	Up=u
+	Down=d
+	Left=l
+	Right=r
+
+	xCo = {1..5}
+	yCo = {1..5}
+
+	pacman=p
+	agent={p; blinky; }
+
+	NoPos = {1,1; 1,2; 4,2; 4,3; }
+	I_position={p,1,3; blinky, 4,4}
+
+	Wall = {2,2,u;2,3,r;3,2,d;4,4,u;1,4,r;2,4,u}
+	
+	I_gold<cf> = {1,1; 1,2; 4,2; 4,3; 5,5 }
+	I_gold<u> = {}
+
+		
+}

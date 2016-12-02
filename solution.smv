@@ -1,0 +1,173 @@
+--Authors: Francis Duvivier & Yuri Passchyn
+
+--Main module
+MODULE main 
+	VAR 
+		pacman : agent(0,4,FALSE,gameover);
+		ghost : agent(2,2,TRUE,gameover);
+		
+		sq1 : square(pacman, ghost,0, 1 ,FALSE ,TRUE ,TRUE ,FALSE );
+		sq2 : square(pacman, ghost,1, 1 ,TRUE ,TRUE ,FALSE ,FALSE );
+		sq3 : square(pacman, ghost,2, 1 ,FALSE ,TRUE ,FALSE ,TRUE );
+		sq4 : square(pacman, ghost,0, 2 ,FALSE ,FALSE ,TRUE ,TRUE );
+		sq5 : square(pacman, ghost,2, 2 ,FALSE ,FALSE ,TRUE ,TRUE );
+		sq6 : square(pacman, ghost,0, 3 ,FALSE ,FALSE ,TRUE ,FALSE );
+		sq7 : square(pacman, ghost,1, 3 ,FALSE ,TRUE ,FALSE ,FALSE );
+		sq8 : square(pacman, ghost,2, 3 ,TRUE ,FALSE ,FALSE ,TRUE );
+		sq9 : square(pacman, ghost,0, 4 ,TRUE ,FALSE ,TRUE ,FALSE );
+		sq10 :square(pacman, ghost,1, 4 ,TRUE ,FALSE ,FALSE ,TRUE );
+		
+		--Depicts whether the game is won, lost or still going on.			
+		gameState : {WIN,LOSE,playing};
+		--Depicts whether the game is over or not: gameState!=playing
+		gameover: boolean;
+	ASSIGN
+		--the game starts in playing gameState
+		init(gameState):=playing;
+		
+		--We specify the transition behavior of the gameState
+		next(gameState):=
+		case
+			--if the game is over, then the gameState will stay the same
+			gameover:gameState;
+			--if pacman and ghost are on the same spot in the next state, then the gamestate will be LOSE
+			(next(ghost.x)=next(pacman.x)&next(ghost.y)=next(pacman.y)) : LOSE;
+			--if pacman and ghost are going to have crossed each other, then the gamestate will be LOSE
+			((ghost.x=next(pacman.x)&ghost.y=next(pacman.y)) & (next(ghost.x)=pacman.x&next(ghost.y)=pacman.y))  :LOSE;
+			--Otherwise, if there are no more coins in the next state, then the gamestate will be WIN
+			(!next(stillCoins)) : WIN;
+			--in other cases, the gamestate will stay the same.
+			TRUE:gameState;
+		esac;
+	DEFINE
+		--We check every square to see if there are any coins left. If there are no more coins, 
+		--stillCoins is false, otherwise true;
+		stillCoins:=sq1.hasCoin|sq2.hasCoin|sq3.hasCoin|sq4.hasCoin|sq5.hasCoin|sq6.hasCoin|sq7.hasCoin|sq8.hasCoin|sq9.hasCoin|sq10.hasCoin;	--add "|sq...hasCoin" here for adding squares
+	
+	TRANS
+	--gameover is always equivalent to gameState!=playing
+	gameover <-> gameState!=playing;
+	TRANS
+	--we use this to make sure that in stillCoins is FALSE in the beginning of the game. 
+	--This means there is at least 1 square with a coin, otherwise the game is meaningless.
+	stillCoins=FALSE -> gameover;
+	--Requirement: it is possible to win the game
+	CTLSPEC EF gameState=WIN;
+	--Requirement: it is possible to lose the game
+	CTLSPEC EF gameState=LOSE;
+	--Requirement:  Globally for all states it is true, that it is possible that there always is a 
+	--future with positions 1,1 for pacman;
+	CTLSPEC (EG( EF  (pacman.y=1 & pacman.x=1) ) );
+	--Requirement: In every state it is true that if, in every state (so infinitely),
+	--there is a future with positions 1,1 and 1,3 for pacman, then the gameState will never be WIN.
+	LTLSPEC (G (G ( (F(pacman.x=1 &  pacman.y=1))  &  (F(pacman.x=1 &  pacman.y=3)) )  ) -> (G gameState!=WIN) );
+	--Requirement: If the game is lost, it wil always stay lost.
+	CTLSPEC AG (gameState=LOSE -> (AG gameState=LOSE))
+	--Requirement: If the game is won, it wil always stay won.
+	CTLSPEC AG (gameState=WIN -> (AG gameState=WIN))
+	--Requirement: There are at least 10 steps needed to win the game, expressed as: it cannot be 
+	--won after 10 state changes. We count ten because the game does not start in the initial state 
+	--but in the second state. So pacman's steps start from the second state.
+	CTLSPEC !(EX EX EX EX EX EX EX EX EX EX gameState=WIN)
+	
+--Represents a "walking object"
+-- it has a startposition (given by startX and startY), 
+-- a boolean isGhost that is true if this agent is a ghost, 
+-- and it knows whether the game is over (boolean gameover)
+MODULE agent(startX,startY,isGhost,gameover)
+	VAR 
+	--We have chosen the boundaries bigger than needed so that it shows the program can work with 
+	--bigger bords too.
+	x:0..10; 
+	y:0..10;
+	-- u, d, l and r represent in which direction the agent is going to move. At most one these will 
+	--be true at any time.
+	u:boolean;
+	d:boolean;
+	l:boolean;
+	r:boolean;
+	--This is a boolean which becomes true after the initial state. 
+	--We don want the game to be started already in the initial state for better able to check 
+	--existential requirements about all possible games.
+	gameStarted:boolean;
+	ASSIGN
+	init(gameStarted):=FALSE;
+	next(gameStarted):=TRUE;
+	--x and y is initialized to the given position
+	init(x):=startX;
+	init(y):=startY;
+	--We specify the transition behavior of the x-coordinate of the agent. We make sure that the 
+	--agent does not try to go outside of the reach of x.
+	next(x):=
+		case 
+			--if the agent is going to move left then the x-co will be diminished by one. 
+			l &x>0 : x - 1;
+			--if the agent is going to move right then the x-co will be increased by one.
+			r &x<10: x + 1;
+			--in the other cases, the x-co will stay the same.
+			TRUE : x;
+		esac;
+		
+	--We specify the transition behavior of the x-coordinate of the agent. We make sure that the 
+	--agent does not try to go outside of the reach of y.
+	next(y):=
+		case
+			--if the agent is going to move up then theyx-co will be increased by one.		
+			u & y<10 : y + 1;
+			--if the agent is going to move down then the y-co will be diminished by one.
+			d & y>0: y - 1;
+			--in the other cases, the y-co will stay the same.
+			TRUE : y;
+		esac;
+	TRANS 
+	--An agent always moves in exactly one direction if the game has started and is not over, 
+	--ohterwise it does not move in any direction.
+	--If an agent could already have a move direction in the initial state,then it is possible that 
+	--the end of the game is already determined in the initial state which would make it a 
+	--meaningless game.
+	((!gameover & gameStarted) & ((u&!d&!l&!r) | (!u&d&!l&!r) | (!u&!d&l&!r) | (!u&!d&!l&r))) | ((!gameStarted|gameover) & (!u&!d&!l&!r)) ;
+			
+
+--Represents a square
+--u, d, l and r are booleans representing whether or not there is a wall in that specific direction 
+--from the square
+--pacman and ghost are the unique player and ghost 
+--x and y are its coordinates on the square
+MODULE square(pacman,ghost,x,y,u,d,l,r)
+	VAR
+	--specifies whether or not there is a coin on this square in the current state.
+	hasCoin:boolean;
+	
+	ASSIGN
+		--Gold is initially true or false for every square. But if pacman is on this square, we make
+		--it false because that would be a meaningless goldcoin. In this way, togheter with the fact that 
+		--the game starts in the second state, we can check initial state for being win and losable
+		--simply by stating that stillCoins should be true in the initial state.
+		init(hasCoin):= --change this to true if a goldCoin should be on every square initially.
+		case
+			x=pacman.x & y=pacman.y:FALSE;
+			TRUE:{TRUE,FALSE};
+		esac;
+		--We specify the transition behavior of hasCoin
+		next(hasCoin):=
+		case 
+			--hasCoin is false in the next state if pacman is on this tile in this state.
+			pacman.x=x  &  pacman.y=y :FALSE;
+			--Otherwise, hasCoin is true in the next state if it is in this state. 
+			TRUE : hasCoin;
+		esac;
+	
+	TRANS
+		--If the position of pacman is the same as the position of this square then this square 
+		--makes sure pacman does not move through a wall
+		x=pacman.x & y=pacman.y -> ((u -> !pacman.u) & (d -> !pacman.d) & (l -> !pacman.l) & (r -> !pacman.r));
+	
+	TRANS
+		--If the position of ghost is the same as the position of this square then this square makes
+		--sure ghost does not move through a wall
+		x=ghost.x & y=ghost.y -> ((u -> !ghost.u) & (d -> !ghost.d) & (l -> !ghost.l) & (r -> !ghost.r));
+	
+	--Requirement: the amount of gold can not increase
+	CTLSPEC
+		AG (!hasCoin -> (AG (!hasCoin)));
+
